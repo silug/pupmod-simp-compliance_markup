@@ -203,22 +203,27 @@ def compiler_class()
         "simp/compliance_profiles"
       ]
 
-      ['yaml', 'json'].each do |type|
-        # Using the power of glob for great good
-        Dir.glob(
-          File.join(
-            "{#{base_paths.join(',')}}",   # Glob against all base module paths
-              "{#{load_paths.join(',')}}", # And all intermediate load paths
-              '**',                        # And all directories underneath
-              "*.#{type}"                  # Of the given file type
-          )
-        ) do |filename|
-          begin
-            compliance_data_merge(filename => YAML.load(File.read(filename))) if type == 'yaml'
-            compliance_data_merge(filename => JSON.parse(File.read(filename))) if type == 'json'
-          rescue => e
-            warn(%{compliance_engine: Invalid '#{type}' file found at '#{filename}' => #{e}})
+      files = Dir.glob(
+        File.join(
+          "{#{base_paths.join(',')}}",   # Glob against all base module paths
+            "{#{load_paths.join(',')}}", # And all intermediate load paths
+            '**',                        # And all directories underneath
+            "*.{yaml,json}"                  # Of the given file type
+        )
+      )
+
+      files.each do |filename|
+        begin
+          case filename
+          when %r{\.yaml$}
+            compliance_data_merge(filename => YAML.load(File.read(filename)))
+          when %r{\.json$}
+            compliance_data_merge(filename => JSON.parse(File.read(filename)))
+          else
+            raise "Unknown file type"
           end
+        rescue => e
+          warn(%{compliance_engine: Invalid file found at '#{filename}' => #{e}})
         end
       end
 
