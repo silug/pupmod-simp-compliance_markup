@@ -143,14 +143,17 @@ def compiler_class()
       @version = SemanticPuppet::Version.parse('2.5.0')
     end
 
+    def compliance_data_merge(value)
+      @compliance_data = {} if @compliance_data.nil?
+
+      @compliance_data.merge!(value)
+    end
+
     def load(options={}, &block)
       @callback.debug("callback = #{callback.codebase}")
 
       module_scope_compliance_map = callback.cached_lookup "compliance_markup::compliance_map", {}, &block
       top_scope_compliance_map    = callback.cached_lookup "compliance_map", {}, &block
-
-
-      @compliance_data = {}
 
       moduleroot = File.expand_path('../../../../../', __FILE__)
       rootpaths  = {}
@@ -211,20 +214,22 @@ def compiler_class()
           )
         ) do |filename|
           begin
-            @compliance_data[filename] = YAML.load(File.read(filename)) if (type == 'yaml')
-            @compliance_data[filename] = JSON.parse(File.read(filename)) if (type == 'json')
+            compliance_data_merge(filename => YAML.load(File.read(filename))) if type == 'yaml'
+            compliance_data_merge(filename => JSON.parse(File.read(filename))) if type == 'json'
           rescue => e
             warn(%{compliance_engine: Invalid '#{type}' file found at '#{filename}' => #{e}})
           end
         end
       end
 
-      @compliance_data["puppet://compliance_markup::compliance_map"] = (module_scope_compliance_map)
-      @compliance_data["puppet://compliance_map"]                    = (top_scope_compliance_map)
+      compliance_data_merge(
+        "puppet://compliance_markup::compliance_map" => module_scope_compliance_map,
+        "puppet://compliance_map"                    => top_scope_compliance_map,
+      )
 
       @v2 = v2_compiler.new(callback)
 
-      @compliance_data.each do |filename, map|
+      compliance_data.each do |filename, map|
         if map.key?("version")
           version = SemanticPuppet::Version.parse(map["version"])
 
